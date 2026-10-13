@@ -1,4 +1,6 @@
 using System;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -75,10 +77,29 @@ namespace WinWidget.Tests
             return 0;
         }
 
+        // Feeds 60 synthetic samples (CPU ramps into warn/critical, disk bursts) and saves the widget as PNG.
         public static int Render(string path)
         {
-            Console.WriteLine("render not implemented");
-            return 1;
+            using (var form = new WidgetForm())
+            {
+                for (int i = 0; i < 60; i++)
+                {
+                    Snapshot s = Snapshot.Empty;
+                    s.CpuPercent = 20 + 75.0 * i / 59;
+                    s.MemTotalBytes = 32.0 * 1073741824;
+                    s.MemUsedBytes = (10 + 3 * Math.Sin(i / 6.0)) * 1073741824;
+                    s.DiskReadBps = (i % 15 == 0 ? 40 : 2) * Format.OneMb;
+                    s.DiskWriteBps = (i % 20 == 5 ? 25 : 0.5) * Format.OneMb;
+                    form.Push(s);
+                }
+                using (var bmp = new Bitmap(form.Width, form.Height))
+                {
+                    form.DrawToBitmap(bmp, new Rectangle(Point.Empty, form.Size));
+                    bmp.Save(path, ImageFormat.Png);
+                }
+            }
+            Console.WriteLine("rendered " + path);
+            return 0;
         }
     }
 }
