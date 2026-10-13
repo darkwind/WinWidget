@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 
 namespace WinWidget.Tests
 {
@@ -58,8 +59,20 @@ namespace WinWidget.Tests
     {
         public static int Dump()
         {
-            Console.WriteLine("dump not implemented");
-            return 1;
+            using (var sampler = new MetricsSampler())
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    Thread.Sleep(1000);
+                    Snapshot s = sampler.Sample();
+                    Console.WriteLine(string.Format("CPU {0,5}  MEM {1}/{2}GB {3,4}  R {4,11}  W {5,11}",
+                        Format.Percent(s.CpuPercent),
+                        Format.Gb(s.MemUsedBytes), Format.Gb(s.MemTotalBytes),
+                        Format.Percent(Format.MemPercent(s.MemUsedBytes, s.MemTotalBytes)),
+                        Format.Rate(s.DiskReadBps), Format.Rate(s.DiskWriteBps)));
+                }
+            }
+            return 0;
         }
 
         public static int Render(string path)
