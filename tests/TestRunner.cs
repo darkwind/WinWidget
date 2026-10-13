@@ -90,6 +90,8 @@ namespace WinWidget.Tests
                     s.MemUsedBytes = (10 + 3 * Math.Sin(i / 6.0)) * 1073741824;
                     s.DiskReadBps = (i % 15 == 0 ? 40 : 2) * Format.OneMb;
                     s.DiskWriteBps = (i % 20 == 5 ? 25 : 0.5) * Format.OneMb;
+                    s.NetRecvBps = (i % 12 == 0 ? 8 : 0.3) * Format.OneMb;
+                    s.NetSendBps = (i % 18 == 3 ? 3 : 0.1) * Format.OneMb;
                     form.Push(s);
                 }
                 using (var bmp = new Bitmap(form.Width, form.Height))

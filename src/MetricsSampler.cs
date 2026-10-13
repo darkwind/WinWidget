@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 
 namespace WinWidget
@@ -11,6 +12,8 @@ namespace WinWidget
         public double MemTotalBytes;
         public double DiskReadBps;
         public double DiskWriteBps;
+        public double NetRecvBps;
+        public double NetSendBps;
 
         public static Snapshot Empty
         {
@@ -22,6 +25,8 @@ namespace WinWidget
                 s.MemTotalBytes = double.NaN;
                 s.DiskReadBps = double.NaN;
                 s.DiskWriteBps = double.NaN;
+                s.NetRecvBps = double.NaN;
+                s.NetSendBps = double.NaN;
                 return s;
             }
         }
@@ -32,6 +37,9 @@ namespace WinWidget
         private readonly PerformanceCounter _cpu;
         private readonly PerformanceCounter _diskRead;
         private readonly PerformanceCounter _diskWrite;
+        private readonly NetworkRate _net = new NetworkRate();
+        private readonly Stopwatch _netClock = Stopwatch.StartNew();
+        private double _netLastSeconds;
 
         public MetricsSampler()
         {
@@ -49,6 +57,8 @@ namespace WinWidget
             s.DiskReadBps = Read(_diskRead);
             s.DiskWriteBps = Read(_diskWrite);
 
+            SampleNetwork(ref s);
+
             var mem = new MEMORYSTATUSEX();
             mem.dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
             if (GlobalMemoryStatusEx(ref mem))
@@ -57,6 +67,33 @@ namespace WinWidget
                 s.MemUsedBytes = mem.ullTotalPhys - mem.ullAvailPhys;
             }
             return s;
+        }
+
+        private void SampleNetwork(ref Snapshot s)
+        {
+            long recv = 0, send = 0;
+            try
+            {
+                foreach (NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (nic.OperationalStatus != OperationalStatus.Up) continue;
+                    if (nic.NetworkInterfaceType == NetworkInterfaceType.Loopback ||
+                        nic.NetworkInterfaceType == NetworkInterfaceType.Tunnel) continue;
+                    IPv4InterfaceStatistics st = nic.GetIPv4Statistics();
+                    recv += st.BytesReceived;
+                    send += st.BytesSent;
+                }
+            }
+            catch (Exception)
+            {
+                return;
+            }
+
+            double now = _netClock.Elapsed.TotalSeconds;
+            _net.Update(recv, send, now - _netLastSeconds);
+            _netLastSeconds = now;
+            s.NetRecvBps = _net.RecvBps;
+            s.NetSendBps = _net.SendBps;
         }
 
         public void Dispose()

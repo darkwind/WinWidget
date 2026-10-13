@@ -18,12 +18,16 @@ namespace WinWidget
         private static readonly Color CriticalColor = Color.FromArgb(245, 101, 101);
         private static readonly Color ReadColor = Color.FromArgb(99, 179, 237);
         private static readonly Color WriteColor = Color.FromArgb(183, 148, 244);
+        private static readonly Color DownColor = Color.FromArgb(104, 211, 145);
+        private static readonly Color UpColor = Color.FromArgb(246, 135, 179);
 
         private readonly MetricsSampler _sampler = new MetricsSampler();
         private readonly RingBuffer _cpu = new RingBuffer(History);
         private readonly RingBuffer _mem = new RingBuffer(History);
         private readonly RingBuffer _read = new RingBuffer(History);
         private readonly RingBuffer _write = new RingBuffer(History);
+        private readonly RingBuffer _down = new RingBuffer(History);
+        private readonly RingBuffer _up = new RingBuffer(History);
         private readonly Timer _timer = new Timer();
         private readonly Font _labelFont = new Font("Segoe UI", 8.5f);
         private readonly Font _valueFont = new Font("Segoe UI Semibold", 9.5f);
@@ -41,7 +45,7 @@ namespace WinWidget
             Text = "WinWidget";
 
             using (Graphics g = CreateGraphics()) _scale = g.DpiX / 96f;
-            ClientSize = new Size(S(240), S(164));
+            ClientSize = new Size(S(240), S(212));
             using (GraphicsPath path = RoundedRect(new Rectangle(Point.Empty, ClientSize), S(10)))
                 Region = new Region(path);
 
@@ -66,6 +70,8 @@ namespace WinWidget
             _mem.Push(Format.MemPercent(s.MemUsedBytes, s.MemTotalBytes));
             _read.Push(s.DiskReadBps);
             _write.Push(s.DiskWriteBps);
+            _down.Push(s.NetRecvBps);
+            _up.Push(s.NetSendBps);
             Invalidate();
         }
 
@@ -98,6 +104,11 @@ namespace WinWidget
             DrawRow(g, pad, pad + 2 * rowHeight, width, "DISK",
                 "R " + Format.Rate(_last.DiskReadBps) + "   W " + Format.Rate(_last.DiskWriteBps),
                 ReadColor, _read, diskMax, _write, WriteColor);
+
+            double netMax = Format.ScaleMax(MaxOf(_down.Max(), _up.Max()));
+            DrawRow(g, pad, pad + 3 * rowHeight, width, "NET",
+                "↓ " + Format.Rate(_last.NetRecvBps) + "   ↑ " + Format.Rate(_last.NetSendBps),
+                DownColor, _down, netMax, _up, UpColor);
         }
 
         private void DrawRow(Graphics g, float x, float y, float width, string label, string value,
