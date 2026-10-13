@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace WinWidget
 {
@@ -16,6 +17,7 @@ namespace WinWidget
         private const int HTCAPTION = 2;
         private const int GWLP_HWNDPARENT = -8;
         private static readonly IntPtr HWND_BOTTOM = new IntPtr(1);
+        private static readonly int WM_TASKBARCREATED = RegisterWindowMessage("TaskbarCreated");
 
         private Settings _settings;
         private NotifyIcon _tray;
@@ -72,6 +74,19 @@ namespace WinWidget
             _tray.Text = "WinWidget";
             _tray.ContextMenuStrip = _menu;
             _tray.Visible = true;
+
+            SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+        }
+
+        // Pulls the widget back on screen when the monitor it sat on disappears.
+        internal void EnsureOnScreen(Rectangle[] workingAreas, Rectangle primary)
+        {
+            Location = Placement.Resolve(Location.X, Location.Y, Size, workingAreas, primary);
+        }
+
+        private void OnDisplaySettingsChanged(object sender, EventArgs e)
+        {
+            EnsureOnScreen(Screen.AllScreens.Select(s => s.WorkingArea).ToArray(), Screen.PrimaryScreen.WorkingArea);
         }
 
         // Fallback in case "show desktop" or another tool still hid or minimized us.
@@ -83,6 +98,7 @@ namespace WinWidget
 
         partial void DisposeDesktop()
         {
+            SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             if (_tray != null)
             {
                 _tray.Visible = false;
@@ -94,13 +110,21 @@ namespace WinWidget
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
-            // Owning the window by the desktop (Progman) keeps it visible after Win+D.
+            AttachToDesktop();
+        }
+
+        // Owning the window by the desktop (Progman) keeps it visible after Win+D.
+        private void AttachToDesktop()
+        {
             IntPtr progman = FindWindow("Progman", null);
             if (progman != IntPtr.Zero) SetOwner(Handle, progman);
         }
 
         protected override void WndProc(ref Message m)
         {
+            // Explorer restarted: the old Progman is gone, re-attach to the new one.
+            if (m.Msg == WM_TASKBARCREATED) AttachToDesktop();
+
             if (m.Msg == WM_WINDOWPOSCHANGING)
             {
                 var pos = (WINDOWPOS)Marshal.PtrToStructure(m.LParam, typeof(WINDOWPOS));
@@ -169,6 +193,9 @@ namespace WinWidget
 
         [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
         private static extern int SetWindowLong32(IntPtr hwnd, int index, int value);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int RegisterWindowMessage(string name);
 
         [DllImport("user32.dll")]
         private static extern bool ReleaseCapture();

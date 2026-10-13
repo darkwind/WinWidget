@@ -16,6 +16,11 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 - 왼쪽 드래그로 이동 (위치는 `%APPDATA%\WinWidget\settings.ini`에 저장)
 - 위젯 또는 트레이 아이콘 우클릭: 위치 잠금 / Windows 시작 시 실행 / 종료
 
+## 알려진 제약
+
+- 배율(DPI)이 서로 다른 모니터로 옮기거나 실행 중 배율을 바꾸면 글자가 흐려진다. 위젯을 다시 실행하면 정상으로 돌아온다.
+- 위젯이 실행 중이면 `bin\WinWidget.exe`가 잠겨 빌드가 실패한다. 트레이 메뉴에서 종료한 뒤 빌드한다.
+
 ## 테스트
 
 ```powershell
